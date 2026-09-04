@@ -1,0 +1,18 @@
+{
+  "name": "dokidlc",
+  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, and memory to follow.",
+  "owner": {
+    "name": "DaftDoki"
+  },
+  "plugins": [
+    {
+      "name": "questlog",
+      "description": "Quests and chores with staged review",
+      "source": {
+        "source": "github",
+        "repo": "daftdoki/dokidlc-skill-questlog",
+        "ref": "main"
+      }
+    }
+  ]
+}
