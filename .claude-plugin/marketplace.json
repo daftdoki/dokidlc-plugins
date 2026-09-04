@@ -11,7 +11,7 @@
       "source": {
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-questlog",
-        "ref": "main"
+        "sha": "c147282c009f1f737334394587ee57e782d004e2"
       }
     }
   ]
