@@ -13,6 +13,15 @@
         "repo": "daftdoki/dokidlc-skill-questlog",
         "sha": "c147282c009f1f737334394587ee57e782d004e2"
       }
+    },
+    {
+      "name": "memory",
+      "description": "A per-agent memory in the memoryfield format, searched semantically, with suspicion instead of expiry",
+      "source": {
+        "source": "github",
+        "repo": "daftdoki/dokidlc-skill-memory",
+        "sha": "e2c038d03e229eafbe6b308f501ace5021ecef30"
+      }
     }
   ]
 }
