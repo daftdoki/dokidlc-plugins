@@ -15,7 +15,7 @@ jobs:
       - run: claude plugin validate .
       - name: every pinned source resolves
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.CATALOG_READ_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           python3 - <<'PY'
           import json, subprocess, sys
@@ -25,6 +25,13 @@ jobs:
               src = p['source']
               if isinstance(src, dict) and src.get('source') == 'github':
                   ref = src.get('sha') or src.get('ref') or 'main'
+                  # The workflow token is scoped to this repository. A private
+                  # plugin repository is invisible to it, so skip rather than fail;
+                  # set CATALOG_READ_TOKEN as GH_TOKEN to check private repositories.
+                  seen = subprocess.run(['gh', 'api', f"repos/{src['repo']}"], capture_output=True, text=True)
+                  if seen.returncode != 0:
+                      print(p['name'], src['repo'], 'not visible to this token; skipped')
+                      continue
                   r = subprocess.run(['gh', 'api', f"repos/{src['repo']}/commits/{ref}", '--jq', '.sha'], capture_output=True, text=True)
                   print(p['name'], src['repo'], ref, 'ok' if r.returncode == 0 else 'MISSING')
                   bad += r.returncode != 0
