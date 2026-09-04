@@ -1,0 +1,32 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin validate .
+      - name: every pinned source resolves
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys
+          cat = json.load(open('.claude-plugin/marketplace.json'))
+          bad = 0
+          for p in cat['plugins']:
+              src = p['source']
+              if isinstance(src, dict) and src.get('source') == 'github':
+                  ref = src.get('sha') or src.get('ref') or 'main'
+                  r = subprocess.run(['gh', 'api', f"repos/{src['repo']}/commits/{ref}", '--jq', '.sha'], capture_output=True, text=True)
+                  print(p['name'], src['repo'], ref, 'ok' if r.returncode == 0 else 'MISSING')
+                  bad += r.returncode != 0
+          sys.exit(1 if bad else 0)
+          PY
