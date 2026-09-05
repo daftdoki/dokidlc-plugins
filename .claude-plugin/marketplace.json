@@ -11,7 +11,7 @@
       "source": {
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-questlog",
-        "sha": "f52bdad1ce2bd2f4e83affb0dea10c3db3eb6162"
+        "sha": "6ce07bf112f755ef4edf9099c0f13baf95eb32df"
       }
     },
     {
@@ -20,7 +20,7 @@
       "source": {
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-memory",
-        "sha": "72fbd3f74f3a423fb41eea81dd8f5118b7ab3612"
+        "sha": "d1b9561f19a6ed29272934deb2f20cfb2d1a54e4"
       }
     }
   ]
