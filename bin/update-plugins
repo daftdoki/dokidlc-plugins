@@ -1,0 +1,19 @@
+#!/bin/sh
+# Update every dokidlc plugin for the project in the current directory.
+#
+#   update-plugins [SCOPE]
+#
+# SCOPE is project by default. The script refreshes the local marketplace
+# clone first, because `claude plugin update` reads that clone, not GitHub.
+# Restart open sessions afterward; Claude Code loads plugins at start.
+set -eu
+
+scope=${1:-project}
+manifest="$(cd "$(dirname "$0")/.." && pwd)/.claude-plugin/marketplace.json"
+
+claude plugin marketplace update dokidlc
+
+python3 -c 'import json,sys; [print(p["name"]) for p in json.load(open(sys.argv[1]))["plugins"]]' "$manifest" |
+while read -r name; do
+    claude plugin update "$name@dokidlc" -s "$scope" -y
+done
