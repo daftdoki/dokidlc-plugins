@@ -12,3 +12,10 @@ Add it to a machine:
 
 Or let a project carry it in `.claude/settings.json` under
 `extraKnownMarketplaces` and `enabledPlugins`.
+
+## Plugins
+
+| Plugin | What it does |
+| --- | --- |
+| [questlog](https://github.com/daftdoki/dokidlc-skill-questlog) | Tracks work as quests and chores with staged review. The agent drafts, the creator decides. |
+| [memory](https://github.com/daftdoki/dokidlc-skill-memory) | A per-agent memory of markdown pages in `.memory/`, searched semantically. Pages carry suspicion instead of expiry. |
