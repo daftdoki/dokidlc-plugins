@@ -1,8 +1,6 @@
 # dokidlc-plugins
 
-The catalog for the `dokidlc` plugin marketplace. One file matters:
-`.claude-plugin/marketplace.json`, which lists each plugin and pins it to a
-commit. Bumping a pin is a release.
+The catalog for the `dokidlc` plugin marketplace.
 
 Add it to a machine:
 
