@@ -18,4 +18,4 @@ Or let a project carry it in `.claude/settings.json` under
 | Plugin | What it does |
 | --- | --- |
 | [questlog](https://github.com/daftdoki/dokidlc-skill-questlog) | Tracks work as quests and chores with staged review. The agent drafts, the creator decides. |
-| [memory](https://github.com/daftdoki/dokidlc-skill-memory) | A per-agent memory of markdown pages in `.memory/`, searched semantically. Pages carry suspicion instead of expiry. |
+| [memory](https://github.com/daftdoki/dokidlc-skill-memory) | A per-agent memory of markdown pages in `.memory/`, written and recalled automatically by hooks. Pages never expire; a page that proves wrong gets flagged for review instead. |
