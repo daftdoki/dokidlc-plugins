@@ -1,6 +1,6 @@
 {
   "name": "dokidlc",
-  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, and memory to follow.",
+  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog and memory.",
   "owner": {
     "name": "DaftDoki"
   },
