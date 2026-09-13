@@ -7,11 +7,11 @@
   "plugins": [
     {
       "name": "questlog",
-      "description": "Quests and chores with staged review",
+      "description": "Quests and chores through one flat machine of states, with creator review",
       "source": {
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-questlog",
-        "sha": "723932e3dfdfc8a60f880c4962b07871de9b9396"
+        "sha": "dfe2c4a7f3c5baba8a4e8959e9abd04145cf345e"
       }
     },
     {
