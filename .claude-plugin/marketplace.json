@@ -29,7 +29,7 @@
       "source": {
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-unslop",
-        "sha": "4080bd51a96bb65b057ccbb598d71a5e87dfce25"
+        "sha": "f0d54184cdfd08eb28e20a65834aa21a802338f2"
       }
     },
     {
@@ -38,7 +38,7 @@
       "source": {
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-writing-for-agents",
-        "sha": "7ee86d53260a4664b1cb660ee6021256e1a57a49"
+        "sha": "363533e6941cb2a7c15f8631b256fbb5d89d7e09"
       }
     }
   ]
