@@ -17,6 +17,8 @@ Or let a project carry it in `.claude/settings.json` under
 | --- | --- |
 | [questlog](https://github.com/daftdoki/dokidlc-skill-questlog) | Tracks work as quests and chores with staged review. The agent drafts, the creator decides. |
 | [memory](https://github.com/daftdoki/dokidlc-skill-memory) | A per-agent memory of markdown pages in `.memory/`, written and recalled automatically by hooks. Pages never expire; a page that proves wrong gets flagged for review instead. |
+| [unslop](https://github.com/daftdoki/dokidlc-skill-unslop) | Rules for cutting AI tells from writing and keeping a human voice. Lauren Tan's pstack skill with the soul section kept. The plugin puts the rules in context at every session and subagent start. |
+| [writing-for-agents](https://github.com/daftdoki/dokidlc-skill-writing-for-agents) | The reference for writing skills, `CLAUDE.md`, and any document an agent reads. Matt Pocock's skill, vendored unchanged. |
 
 ## Updating a project
 

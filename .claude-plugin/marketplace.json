@@ -1,6 +1,6 @@
 {
   "name": "dokidlc",
-  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog and memory.",
+  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, memory, unslop, and writing-for-agents.",
   "owner": {
     "name": "DaftDoki"
   },
@@ -21,6 +21,24 @@
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-memory",
         "sha": "85d0efa4781fd21c9e74d77a275a1566d0661075"
+      }
+    },
+    {
+      "name": "unslop",
+      "description": "Cut AI tells from any writing. pstack lineage with the soul section and model invocation kept; puts itself in context at session and subagent start",
+      "source": {
+        "source": "github",
+        "repo": "daftdoki/dokidlc-skill-unslop",
+        "sha": "4080bd51a96bb65b057ccbb598d71a5e87dfce25"
+      }
+    },
+    {
+      "name": "writing-for-agents",
+      "description": "Writing documents for agents: skills, AGENTS.md, CLAUDE.md, and any document an agent reads. Matt Pocock's skill, vendored",
+      "source": {
+        "source": "github",
+        "repo": "daftdoki/dokidlc-skill-writing-for-agents",
+        "sha": "7ee86d53260a4664b1cb660ee6021256e1a57a49"
       }
     }
   ]
