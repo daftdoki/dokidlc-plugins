@@ -25,11 +25,11 @@
     },
     {
       "name": "unslop",
-      "description": "Cut AI tells from any writing. pstack lineage with the soul section and model invocation kept; puts itself in context at session and subagent start",
+      "description": "Cut AI tells from any writing. pstack lineage with the soul section narrowed to selection, rule 34 for knowing asides, and model invocation kept; puts itself in context at session and subagent start",
       "source": {
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-unslop",
-        "sha": "f0d54184cdfd08eb28e20a65834aa21a802338f2"
+        "sha": "0bfad43018075b959e57cbd86bf92ed52d509365"
       }
     },
     {
