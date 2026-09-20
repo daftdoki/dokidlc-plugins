@@ -1,6 +1,6 @@
 {
   "name": "dokidlc",
-  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, memory, unslop, and writing-for-agents.",
+  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, memory, unslop, writing-for-agents, and readme.",
   "owner": {
     "name": "DaftDoki"
   },
@@ -39,6 +39,15 @@
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-writing-for-agents",
         "sha": "363533e6941cb2a7c15f8631b256fbb5d89d7e09"
+      }
+    },
+    {
+      "name": "readme",
+      "description": "Write, grade, and keep a README.md for the person deciding whether to use the software. One skill with three verbs and a checker on PATH that gates on why and status",
+      "source": {
+        "source": "github",
+        "repo": "daftdoki/dokidlc-skill-readme",
+        "sha": "2dd7a8c2b3a412511235d644a16a80e46715fc9f"
       }
     }
   ]
