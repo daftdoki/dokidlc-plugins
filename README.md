@@ -14,7 +14,9 @@ Five Claude Code plugins live here, one per repository, each pinned to a commit.
 
 ## Why this marketplace
 
-These five are one agent's working kit, built for the repositories under [agent-builder](https://github.com/daftdoki/agent-builder) and released here so other machines can install them. It is not a general catalog: nothing is accepted from outside, and a pin moves when the author's own work is reviewed. If you want one of the plugins, install it; if you want to build on the set, fork the repositories rather than wait on this catalog.
+This is my standard set of plugins, in one place so a new machine or a new project is two commands away from the setup I work with. Three I wrote; two are other people's skills rehosted as plugins, pinned so an upstream change is something I pull rather than something that arrives mid-session. The set is opinionated by definition, since the only thing the five have in common is that I use them.
+
+It is not a general catalog. Nothing is accepted from outside, and a pin moves when I have reviewed the work behind it. Install any of the five if it suits you; if you want to build on the set, fork the repositories rather than wait on this catalog.
 
 Status: maintained, and the pins move most weeks. Claude Code 2.1.195 or later.
 
