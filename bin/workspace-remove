@@ -2,8 +2,9 @@
 # Usage: workspace-remove < hook-json
 #
 # A Claude Code WorktreeRemove hook for the workspaces that workspace-create
-# makes. It reads worktree_path from the JSON on stdin. It exits 1 and
-# leaves the workspace in place when anything under workspace/ is not a
+# makes. It reads worktree_path from the JSON on stdin. It exits non-zero and
+# leaves the workspace in place when the path is not a worktree under
+# .claude/worktrees of its checkout, when anything under workspace/ is not a
 # linked worktree, when git cannot read a repo's state, or when a repo has
 # uncommitted changes or a commit that no remote branch and no other local
 # branch has. Otherwise it removes every worktree, nested ones first, and
@@ -13,22 +14,9 @@
 # Removal deletes gitignored files in the worktrees with them.
 set -eu
 
-ws=$(jq -r .worktree_path)
-[ -d "$ws" ] || exit 0
-name=$(basename "$ws")
-
 refuse() {
     echo "workspace-remove: $1; workspace kept" >&2
     exit 1
-}
-
-# The worktrees of the workspace, one path per line, nested ones first.
-trees() {
-    for d in "$ws"/workspace/*; do
-        [ -e "$d" ] || [ -L "$d" ] || continue
-        printf '%s\n' "$d"
-    done
-    printf '%s\n' "$ws"
 }
 
 # The checkout that the worktree DIR is linked from.
@@ -36,6 +24,30 @@ main_of() {
     common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir) || return 1
     dirname "$common"
 }
+
+ws=$(jq -r .worktree_path)
+case $ws in '' | null) exit 0 ;; esac
+[ -d "$ws" ] || exit 0
+ws=$(cd "$ws" && pwd -P)
+name=$(basename "$ws")
+
+# Only a workspace: a linked worktree directly under .claude/worktrees of the
+# checkout it belongs to. Anything else Claude Code hands over is refused.
+[ -f "$ws/.git" ] || refuse "$ws is not a linked worktree"
+home=$(main_of "$ws") || refuse "git cannot find the checkout of $ws"
+[ -d "$home/.claude/worktrees" ] &&
+    [ "$(dirname "$ws")" = "$(cd "$home/.claude/worktrees" && pwd -P)" ] ||
+    refuse "$ws is not under .claude/worktrees of $home"
+[ ! -L "$ws/workspace" ] || refuse "$ws/workspace is a symlink"
+
+# The worktrees of the workspace, one path per line, nested ones first.
+# find lists dot names too, which a glob would skip and removal would delete.
+list=$(mktemp)
+trap 'rm -f "$list"' EXIT
+if [ -d "$ws/workspace" ]; then
+    find "$ws/workspace" -mindepth 1 -maxdepth 1 >"$list"
+fi
+printf '%s\n' "$ws" >>"$list"
 
 # Count the commits of REV in DIR that are on no remote branch and on no
 # local branch other than $name.
@@ -46,16 +58,14 @@ unsaved() {
         git -C "$1" rev-list --count "$2" --stdin
 }
 
-# Check every tree before removing any. A clone or a loose file under
-# workspace/ would be deleted unchecked with the agent worktree, so it stops
-# the removal.
-list=$(mktemp)
-trap 'rm -f "$list"' EXIT
-trees >"$list"
-
+# Check every tree before removing any. A clone, a symlink, or a loose file
+# under workspace/ would be deleted unchecked with the agent worktree, so it
+# stops the removal.
 while IFS= read -r dir; do
+    [ ! -L "$dir" ] || refuse "$dir is a symlink"
     [ -f "$dir/.git" ] || refuse "$dir is not a linked worktree"
-    state=$(git -C "$dir" status --porcelain) || refuse "git status failed in $dir"
+    # --untracked-files overrides a status.showUntrackedFiles=no setting.
+    state=$(git -C "$dir" status --porcelain --untracked-files=normal) || refuse "git status failed in $dir"
     [ -z "$state" ] || refuse "$dir has uncommitted changes"
     for rev in HEAD "refs/heads/$name"; do
         git -C "$dir" rev-parse --verify --quiet "$rev" >/dev/null || continue
@@ -64,11 +74,17 @@ while IFS= read -r dir; do
     done
 done <"$list"
 
+stop() {
+    echo "workspace-remove: $1; the workspace is partly removed, run this again after the fix" >&2
+    exit 1
+}
+
 while IFS= read -r dir; do
-    main=$(main_of "$dir")
-    git -C "$main" worktree remove --force "$dir" >&2
-    if [ "$(git -C "$main" config --get "branch.$name.workspace" || true)" = true ]; then
-        git -C "$main" branch -D "$name" >&2
+    main=$(main_of "$dir") || stop "git cannot find the checkout of $dir"
+    git -C "$main" worktree remove --force "$dir" >&2 || stop "git could not remove $dir"
+    if git -C "$main" show-ref --verify --quiet "refs/workspace/$name"; then
+        git -C "$main" branch -D "$name" >&2 || stop "git could not delete branch $name in $main"
+        git -C "$main" update-ref -d "refs/workspace/$name"
     fi
 done <"$list"
 exit 0

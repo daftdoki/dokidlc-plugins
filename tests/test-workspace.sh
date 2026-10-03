@@ -43,7 +43,7 @@ git init -q -b main "$agent"
     cd "$agent" || exit 1
     mkdir .claude
     printf '.claude/worktrees/\nworkspace/\n' >.gitignore
-    printf '# DIR PATH [LINK...]\nshared %s .deps .cache\nghost ~/no/such/clone\n' "$shared" >.claude/workspace-repos
+    printf '# DIR PATH [LINK...]\nshared %s .deps .cache\nghost ~/no/such/clone\nsub/dir %s\n' "$shared" "$shared" >.claude/workspace-repos
     git add -A && git commit -q -m init
 ) || fail "setup of the agent repo"
 ws=$agent/.claude/worktrees/w1
@@ -65,7 +65,9 @@ ok "links point into the shared clone and the nested worktree is clean"
 
 grep -q 'no/such/clone is not a git clone' "$tmp/err" || fail "warning for the missing path"
 [ ! -e "$ws/workspace/ghost" ] || fail "no directory for the missing path"
-ok "a missing path gives a warning, exit 0, and no nested directory"
+grep -q "DIR 'sub/dir' is not one path component" "$tmp/err" || fail "warning for a DIR with a slash"
+[ ! -e "$ws/workspace/sub" ] || fail "no directory for a DIR with a slash"
+ok "a missing path or a DIR with a slash gives a warning, exit 0, and no nested directory"
 
 create w1 >/dev/null 2>&1 || fail "second create exits 0"
 [ "$(grep -c -x '/.deps' "$shared/.git/info/exclude")" = 1 ] || fail "one exclude line after two creates"
@@ -77,11 +79,27 @@ out=$(create w2 "$ws" 2>/dev/null) || fail "create from inside a workspace exits
 remove w2 >/dev/null 2>&1 || fail "remove of the clean w2"
 ok "create from inside a workspace uses the main checkout"
 
-for bad in a/b .hidden -dash "two words"; do
+for bad in a/b .hidden -dash "two words" a..b x.lock HEAD @; do
     create "$bad" >/dev/null 2>&1
     [ $? = 1 ] || fail "the name '$bad' exits 1"
+    [ ! -e "$agent/.claude/worktrees/$bad" ] || fail "the name '$bad' leaves nothing behind"
 done
-ok "a name with a slash, a leading dot or dash, or a space exits 1"
+ok "a name that git does not accept as a branch exits 1"
+
+git -C "$shared" worktree add -q "$tmp/held" -b held 2>/dev/null
+for taken in main held; do
+    create "$taken" >/dev/null 2>&1
+    [ $? = 1 ] || fail "the name '$taken' exits 1"
+    [ ! -e "$agent/.claude/worktrees/$taken" ] || fail "no agent worktree for '$taken'"
+done
+git -C "$agent" show-ref --verify --quiet refs/heads/held && fail "no agent branch for a refused name"
+ok "a name whose branch is checked out elsewhere exits 1 and makes nothing"
+
+printf '{"worktree_path":"%s"}' "$tmp/held" | "$bin/workspace-remove" >/dev/null 2>&1 &&
+    fail "remove refuses a worktree outside .claude/worktrees"
+[ -d "$tmp/held" ] || fail "the outside worktree is still there"
+git -C "$shared" worktree remove "$tmp/held" && git -C "$shared" branch -q -D held
+ok "remove refuses a worktree that is not a workspace"
 
 for tree in "$ws" "$nested"; do
     echo x >"$tree/untracked"
@@ -91,15 +109,32 @@ for tree in "$ws" "$nested"; do
 done
 ok "remove exits 1 with an untracked file in either worktree and keeps it"
 
-git clone -q "$tmp/origin.git" "$ws/workspace/extra" 2>/dev/null
-git -C "$ws/workspace/extra" commit -q --allow-empty -m "only here"
-remove w1 >/dev/null 2>&1 && fail "remove refuses a full clone under workspace/"
-[ -d "$ws/workspace/extra/.git" ] || fail "the full clone is still there"
-rm -rf "$ws/workspace/extra"
-echo note >"$ws/workspace/loose-file"
-remove w1 >/dev/null 2>&1 && fail "remove refuses a loose file under workspace/"
-rm "$ws/workspace/loose-file"
+for extra in extra .hidden; do
+    git clone -q "$tmp/origin.git" "$ws/workspace/$extra" 2>/dev/null
+    git -C "$ws/workspace/$extra" commit -q --allow-empty -m "only here"
+    remove w1 >/dev/null 2>&1 && fail "remove refuses a full clone at workspace/$extra"
+    [ -d "$ws/workspace/$extra/.git" ] || fail "the full clone at workspace/$extra is still there"
+    rm -rf "$ws/workspace/$extra"
+done
+for loose in loose-file .notes; do
+    echo note >"$ws/workspace/$loose"
+    remove w1 >/dev/null 2>&1 && fail "remove refuses the file workspace/$loose"
+    rm "$ws/workspace/$loose"
+done
+create peer >/dev/null 2>&1 || fail "create of a second workspace"
+ln -s "$agent/.claude/worktrees/peer/workspace/shared" "$ws/workspace/peek"
+remove w1 >/dev/null 2>&1 && fail "remove refuses a symlink under workspace/"
+[ -d "$agent/.claude/worktrees/peer/workspace/shared" ] || fail "the other workspace is untouched"
+rm "$ws/workspace/peek"
+remove peer >/dev/null 2>&1 || fail "remove of the peer workspace"
 ok "remove exits 1 when workspace/ holds anything that is not a linked worktree"
+
+git -C "$shared" config status.showUntrackedFiles no
+echo x >"$nested/quiet"
+remove w1 >/dev/null 2>&1 && fail "remove refuses an untracked file that status is set to hide"
+rm "$nested/quiet"
+git -C "$shared" config --unset status.showUntrackedFiles
+ok "remove exits 1 with an untracked file when status.showUntrackedFiles is no"
 
 index=$(git -C "$nested" rev-parse --absolute-git-dir)/index
 cp "$index" "$tmp/index.good"
@@ -144,5 +179,23 @@ create w3 >/dev/null 2>&1 || fail "create with origin/HEAD unset"
     fail "the base is origin/main, not the clone's local HEAD"
 remove w3 >/dev/null 2>&1 || fail "remove of w3"
 ok "with origin/HEAD unset the base is still the remote's main"
+
+round=0
+while [ $round -lt 15 ]; do
+    round=$((round + 1))
+    (create "c$round-a" >/dev/null 2>&1 || echo "c$round-a" >>"$tmp/race") &
+    (create "c$round-b" >/dev/null 2>&1 || echo "c$round-b" >>"$tmp/race") &
+    wait
+done
+[ ! -s "$tmp/race" ] || fail "creates that start together all exit 0; failed: $(tr '\n' ' ' <"$tmp/race")"
+round=0
+while [ $round -lt 15 ]; do
+    round=$((round + 1))
+    for side in a b; do
+        remove "c$round-$side" >/dev/null 2>&1 || fail "remove of c$round-$side"
+        git -C "$shared" show-ref --verify --quiet "refs/heads/c$round-$side" && fail "branch c$round-$side deleted"
+    done
+done
+ok "two creates that start together both succeed, 15 rounds"
 
 echo "all $n cases passed"

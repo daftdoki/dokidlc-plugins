@@ -10,30 +10,61 @@
 # that repo.
 #
 # A line of .claude/workspace-repos is "DIR PATH [LINK...]", split at
-# whitespace, so no field can hold a space. PATH is the shared clone and may
-# start with ~/. Each LINK is a gitignored path that is symlinked from the
-# shared clone into the new worktree. A PATH that does not exist gets a
-# warning and no worktree.
+# whitespace, so no field can hold a space. DIR is one path component. PATH
+# is the shared clone and may start with ~/. Each LINK is a gitignored path
+# that is symlinked from the shared clone into the new worktree. A line whose
+# PATH is not a clone with a commit, or whose DIR is not one component, gets
+# a warning and no worktree.
 #
-# Safe to run again for the same name: it reuses the branches and worktrees
-# that exist.
+# It exits non-zero, before it makes anything, when NAME is not a branch name
+# git accepts or when branch NAME is checked out somewhere else. Safe to run
+# again for the same name: it reuses the branches and worktrees that exist.
 set -eu
 
 name=$(jq -r .name)
 case $name in
-'' | null | .* | -* | */* | *[[:space:]]*)
+'' | null | HEAD | @ | .* | -* | */* | *[[:space:]]*) name_ok=false ;;
+*) git check-ref-format --branch "$name" >/dev/null 2>&1 && name_ok=true || name_ok=false ;;
+esac
+if [ "$name_ok" = false ]; then
     echo "workspace-create: bad name '$name'" >&2
     exit 1
-    ;;
-esac
+fi
 
 # The main checkout, also when this runs from inside a workspace.
 root=$(dirname "$(git -C "${CLAUDE_PROJECT_DIR:-.}" rev-parse --path-format=absolute --git-common-dir)")
+ws=$root/.claude/worktrees/$name
 
-# Make branch $name in REPO if it is missing, and mark it as made here so
-# that workspace-remove deletes it and leaves a branch that was there before.
-# In a repo with a remote the base is origin/$name when an earlier workspace
-# pushed it, else the remote's default branch. With no remote it is HEAD.
+# Print the worktree of REPO that has branch $name checked out, if any.
+holder() {
+    git -C "$1" worktree list --porcelain |
+        awk -v b="branch refs/heads/$name" '/^worktree /{w=substr($0,10)} $0==b{print w}'
+}
+
+# Exit 1 when branch $name of REPO is checked out anywhere but DEST. Git
+# would refuse the worktree later, with half a workspace already made.
+check_free() {
+    repo=$1
+    dest=$2
+    [ -e "$dest/.git" ] && return 0
+    held=$(holder "$repo")
+    if [ -n "$held" ] && [ ! -e "$held" ]; then
+        # The record of a worktree that was deleted by hand.
+        git -C "$repo" worktree prune
+        held=$(holder "$repo")
+    fi
+    [ -z "$held" ] && return 0
+    echo "workspace-create: branch $name of $repo is checked out at $held; pick another name" >&2
+    exit 1
+}
+
+# Make branch $name in REPO if it is missing, and mark it with the ref
+# refs/workspace/$name so that workspace-remove deletes it and leaves a
+# branch that was there before. A ref has its own lock, so two sessions that
+# start together do not collide, as they would on git config. In a repo with
+# a remote the base is origin/$name when an earlier workspace pushed it, else
+# the remote's default branch, else origin/main or origin/master. With no
+# remote, or none of those, it is HEAD.
 ensure_branch() {
     repo=$1
     git -C "$repo" show-ref --verify --quiet "refs/heads/$name" && return 0
@@ -56,7 +87,7 @@ ensure_branch() {
         done
     fi
     git -C "$repo" branch --no-track "$name" "$base" >&2
-    git -C "$repo" config "branch.$name.workspace" true
+    git -C "$repo" update-ref "refs/workspace/$name" "refs/heads/$name"
 }
 
 # Make a worktree of REPO at DEST on branch $name, unless DEST is one already.
@@ -65,11 +96,7 @@ ensure_worktree() {
     dest=$2
     [ -e "$dest/.git" ] && return 0
     ensure_branch "$repo"
-    # A workspace deleted by hand leaves a stale record that blocks the add.
-    git -C "$repo" worktree add "$dest" "$name" >&2 2>/dev/null || {
-        git -C "$repo" worktree prune
-        git -C "$repo" worktree add "$dest" "$name" >&2
-    }
+    git -C "$repo" worktree add "$dest" "$name" >&2
 }
 
 # Symlink LINK from the shared clone REPO into its worktree DEST. git ignores
@@ -91,22 +118,40 @@ ensure_link() {
     echo "/$link" >>"$exclude"
 }
 
-ws=$root/.claude/worktrees/$name
-ensure_worktree "$root" "$ws"
-
+# The usable lines of the list, with ~/ expanded: "DIR PATH [LINK...]".
+entries=$(mktemp)
+trap 'rm -f "$entries" "$entries.raw"' EXIT
 list=$root/.claude/workspace-repos
 if [ -f "$list" ]; then
-    grep -Ev '^[[:space:]]*(#|$)' "$list" | while read -r dir path links; do
+    grep -Ev '^[[:space:]]*(#|$)' "$list" >"$entries.raw" || true
+    while read -r dir path links; do
         case $path in "~/"*) path=$HOME/${path#"~/"} ;; esac
-        if [ ! -d "$path/.git" ]; then
-            echo "workspace-create: $path is not a git clone; no workspace/$dir" >&2
+        case $dir in
+        */* | . | ..)
+            echo "workspace-create: DIR '$dir' is not one path component; skipped" >&2
+            continue
+            ;;
+        esac
+        if [ ! -d "$path/.git" ] || ! git -C "$path" rev-parse --verify --quiet HEAD >/dev/null; then
+            echo "workspace-create: $path is not a git clone with a commit; no workspace/$dir" >&2
             continue
         fi
-        ensure_worktree "$path" "$ws/workspace/$dir"
-        for link in $links; do
-            ensure_link "$path" "$ws/workspace/$dir" "$link"
-        done
-    done
+        printf '%s %s %s\n' "$dir" "$path" "$links" >>"$entries"
+    done <"$entries.raw"
 fi
+
+# Check every repo before making anything.
+check_free "$root" "$ws"
+while read -r dir path links; do
+    check_free "$path" "$ws/workspace/$dir"
+done <"$entries"
+
+ensure_worktree "$root" "$ws"
+while read -r dir path links; do
+    ensure_worktree "$path" "$ws/workspace/$dir"
+    for link in $links; do
+        ensure_link "$path" "$ws/workspace/$dir" "$link"
+    done
+done <"$entries"
 
 echo "$ws"
