@@ -11,7 +11,7 @@
 # then deletes the local branches that workspace-create made. Claude Code
 # never deletes a branch of a hook-made worktree, so this script must. If
 # git fails during the removal, it says that the workspace is partly removed
-# and exits 1; a second run finishes the job.
+# and exits 1. Run it again; docs/session-workspaces.md says what can be left.
 #
 # Removal deletes gitignored files in the worktrees with them.
 set -eu
