@@ -9,11 +9,13 @@
 set -u
 
 bin=$(cd "$(dirname "$0")/../bin" && pwd)
-tmp=$(mktemp -d)
+# Resolved, because macOS reaches its temp directory through a symlink.
+tmp=$(cd "$(mktemp -d)" && pwd -P)
 trap 'rm -rf "$tmp"' EXIT
 export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.invalid
 export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.invalid
-export HOME="$tmp/home"
+# A space in $HOME and in the agent repo path: both must work.
+export HOME="$tmp/my home"
 mkdir -p "$HOME"
 
 n=0
@@ -25,8 +27,8 @@ remove() { printf '{"worktree_path":"%s"}' "$agent/.claude/worktrees/$1" | "$bin
 
 # The scratch repos.
 git init -q --bare -b main "$tmp/origin.git"
-git clone -q "$tmp/origin.git" "$tmp/shared" 2>/dev/null
-shared=$tmp/shared
+shared=$HOME/shared
+git clone -q "$tmp/origin.git" "$shared" 2>/dev/null
 (
     cd "$shared" || exit 1
     printf '.deps/\n.cache/\n*.env\n' >.gitignore
@@ -43,7 +45,7 @@ git init -q -b main "$agent"
     cd "$agent" || exit 1
     mkdir .claude
     printf '.claude/worktrees/\nworkspace/\n' >.gitignore
-    printf '# DIR PATH [LINK...]\nshared %s .deps .cache\nghost ~/no/such/clone\nsub/dir %s\n' "$shared" "$shared" >.claude/workspace-repos
+    printf '# DIR PATH [LINK...]\nshared ~/shared .deps .cache nolink/x\nghost ~/no/such/clone\nsub/dir ~/shared\nagain ~/shared\n' >.claude/workspace-repos
     git add -A && git commit -q -m init
 ) || fail "setup of the agent repo"
 ws=$agent/.claude/worktrees/w1
@@ -67,7 +69,9 @@ grep -q 'no/such/clone is not a git clone' "$tmp/err" || fail "warning for the m
 [ ! -e "$ws/workspace/ghost" ] || fail "no directory for the missing path"
 grep -q "DIR 'sub/dir' is not one path component" "$tmp/err" || fail "warning for a DIR with a slash"
 [ ! -e "$ws/workspace/sub" ] || fail "no directory for a DIR with a slash"
-ok "a missing path or a DIR with a slash gives a warning, exit 0, and no nested directory"
+grep -q "is listed twice" "$tmp/err" || fail "warning for a PATH listed twice"
+[ ! -e "$ws/workspace/again" ] || fail "no directory for a PATH listed twice"
+ok "a missing path, a DIR with a slash, or a second line for one PATH gives a warning, exit 0, and no nested directory"
 
 create w1 >/dev/null 2>&1 || fail "second create exits 0"
 [ "$(grep -c -x '/.deps' "$shared/.git/info/exclude")" = 1 ] || fail "one exclude line after two creates"
@@ -79,7 +83,7 @@ out=$(create w2 "$ws" 2>/dev/null) || fail "create from inside a workspace exits
 remove w2 >/dev/null 2>&1 || fail "remove of the clean w2"
 ok "create from inside a workspace uses the main checkout"
 
-for bad in a/b .hidden -dash "two words" a..b x.lock HEAD @; do
+for bad in a/b .hidden -dash "two words" a..b x.lock HEAD @ "@{-1}"; do
     create "$bad" >/dev/null 2>&1
     [ $? = 1 ] || fail "the name '$bad' exits 1"
     [ ! -e "$agent/.claude/worktrees/$bad" ] || fail "the name '$bad' leaves nothing behind"

@@ -23,7 +23,7 @@ set -eu
 
 name=$(jq -r .name)
 case $name in
-'' | null | HEAD | @ | .* | -* | */* | *[[:space:]]*) name_ok=false ;;
+'' | null | HEAD | @ | .* | -* | */* | *@{* | *[[:space:]]*) name_ok=false ;;
 *) git check-ref-format --branch "$name" >/dev/null 2>&1 && name_ok=true || name_ok=false ;;
 esac
 if [ "$name_ok" = false ]; then
@@ -67,7 +67,12 @@ check_free() {
 # remote, or none of those, it is HEAD.
 ensure_branch() {
     repo=$1
-    git -C "$repo" show-ref --verify --quiet "refs/heads/$name" && return 0
+    if git -C "$repo" show-ref --verify --quiet "refs/heads/$name"; then
+        # The branch is here with no worktree on it. Whoever made it, it is
+        # kept from now on: drop a marker that an earlier workspace left.
+        git -C "$repo" update-ref -d "refs/workspace/$name"
+        return 0
+    fi
     base=HEAD
     if git -C "$repo" remote get-url origin >/dev/null 2>&1; then
         # A slow remote must not hold up the session; macOS has no timeout.
@@ -96,7 +101,12 @@ ensure_worktree() {
     dest=$2
     [ -e "$dest/.git" ] && return 0
     ensure_branch "$repo"
-    git -C "$repo" worktree add "$dest" "$name" >&2
+    # git can trip over another session's half-written worktree record when
+    # several sessions start together; a second try a moment later works.
+    git -C "$repo" worktree add "$dest" "$name" >&2 || {
+        sleep 1
+        git -C "$repo" worktree add "$dest" "$name" >&2
+    }
 }
 
 # Symlink LINK from the shared clone REPO into its worktree DEST. git ignores
@@ -107,7 +117,12 @@ ensure_link() {
     dest=$2
     link=$3
     [ -e "$repo/$link" ] || return 0
-    [ -e "$dest/$link" ] || [ -L "$dest/$link" ] || ln -s "$repo/$link" "$dest/$link"
+    if [ ! -e "$dest/$link" ] && [ ! -L "$dest/$link" ]; then
+        ln -s "$repo/$link" "$dest/$link" || {
+            echo "workspace-create: could not link $link into $dest" >&2
+            return 0
+        }
+    fi
     exclude=$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/info/exclude
     mkdir -p "$(dirname "$exclude")"
     grep -qxF "/$link" "$exclude" 2>/dev/null && return 0
@@ -118,7 +133,8 @@ ensure_link() {
     echo "/$link" >>"$exclude"
 }
 
-# The usable lines of the list, with ~/ expanded: "DIR PATH [LINK...]".
+# The usable lines of the list, with ~/ expanded, as DIR, PATH, and the
+# LINKs, separated by tabs so that a space in $HOME survives.
 entries=$(mktemp)
 trap 'rm -f "$entries" "$entries.raw"' EXIT
 list=$root/.claude/workspace-repos
@@ -136,18 +152,23 @@ if [ -f "$list" ]; then
             echo "workspace-create: $path is not a git clone with a commit; no workspace/$dir" >&2
             continue
         fi
-        printf '%s %s %s\n' "$dir" "$path" "$links" >>"$entries"
+        if cut -f1 "$entries" | grep -qxF "$dir" || cut -f2 "$entries" | grep -qxF "$path"; then
+            echo "workspace-create: $dir or $path is listed twice; the later line is skipped" >&2
+            continue
+        fi
+        printf '%s\t%s\t%s\n' "$dir" "$path" "$links" >>"$entries"
     done <"$entries.raw"
 fi
 
 # Check every repo before making anything.
+tab=$(printf '\t')
 check_free "$root" "$ws"
-while read -r dir path links; do
+while IFS=$tab read -r dir path links; do
     check_free "$path" "$ws/workspace/$dir"
 done <"$entries"
 
 ensure_worktree "$root" "$ws"
-while read -r dir path links; do
+while IFS=$tab read -r dir path links; do
     ensure_worktree "$path" "$ws/workspace/$dir"
     for link in $links; do
         ensure_link "$path" "$ws/workspace/$dir" "$link"

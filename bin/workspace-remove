@@ -8,8 +8,10 @@
 # linked worktree, when git cannot read a repo's state, or when a repo has
 # uncommitted changes or a commit that no remote branch and no other local
 # branch has. Otherwise it removes every worktree, nested ones first, and
-# deletes the local branches that workspace-create made. Claude Code never
-# deletes a branch of a hook-made worktree, so this script must.
+# then deletes the local branches that workspace-create made. Claude Code
+# never deletes a branch of a hook-made worktree, so this script must. If
+# git fails during the removal, it says that the workspace is partly removed
+# and exits 1; a second run finishes the job.
 #
 # Removal deletes gitignored files in the worktrees with them.
 set -eu
@@ -64,6 +66,9 @@ unsaved() {
 while IFS= read -r dir; do
     [ ! -L "$dir" ] || refuse "$dir is a symlink"
     [ -f "$dir/.git" ] || refuse "$dir is not a linked worktree"
+    # A clone made with --separate-git-dir has a .git file too.
+    [ "$(git -C "$dir" rev-parse --absolute-git-dir 2>/dev/null)" != "$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" ] ||
+        refuse "$dir is not a linked worktree"
     # --untracked-files overrides a status.showUntrackedFiles=no setting.
     state=$(git -C "$dir" status --porcelain --untracked-files=normal) || refuse "git status failed in $dir"
     [ -z "$state" ] || refuse "$dir has uncommitted changes"
@@ -79,12 +84,23 @@ stop() {
     exit 1
 }
 
+# Worktrees first, then branches: a branch cannot go while any worktree in
+# the workspace still has it checked out.
+mains=$(mktemp)
+trap 'rm -f "$list" "$mains"' EXIT
 while IFS= read -r dir; do
     main=$(main_of "$dir") || stop "git cannot find the checkout of $dir"
-    git -C "$main" worktree remove --force "$dir" >&2 || stop "git could not remove $dir"
-    if git -C "$main" show-ref --verify --quiet "refs/workspace/$name"; then
-        git -C "$main" branch -D "$name" >&2 || stop "git could not delete branch $name in $main"
-        git -C "$main" update-ref -d "refs/workspace/$name"
-    fi
+    printf '%s\n' "$main" >>"$mains"
+    # Another workspace's removal at the same moment can make git fail once.
+    git -C "$main" worktree remove --force "$dir" >&2 || {
+        sleep 1
+        [ ! -e "$dir" ] || git -C "$main" worktree remove --force "$dir" >&2 || stop "git could not remove $dir"
+    }
 done <"$list"
+
+sort -u "$mains" | while IFS= read -r main; do
+    git -C "$main" show-ref --verify --quiet "refs/workspace/$name" || continue
+    git -C "$main" branch -D "$name" >&2 || stop "git could not delete branch $name in $main"
+    git -C "$main" update-ref -d "refs/workspace/$name"
+done
 exit 0
