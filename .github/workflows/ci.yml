@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: workspace hook scripts
+        run: sh tests/test-workspace.sh
       - name: install Claude Code (native installer, stable channel)
         run: |
           curl -fsSL https://claude.ai/install.sh | bash -s stable

@@ -58,6 +58,43 @@ Checking for updates for plugin "memory@dokidlc" at project scope…
 
 It refreshes the marketplace clone first, because `claude plugin update` reads the clone and not GitHub, then updates each plugin the catalog lists. Pass `user` or `local` as the first argument for another scope.
 
+## Session workspaces
+
+`bin/` also holds two hook scripts that are not plugins. With them, a Claude Code session that starts in a worktree gets a worktree of each other repository it works on, so two sessions never share a checkout.
+
+`workspace-create` runs as the `WorktreeCreate` hook. It makes the usual worktree at `.claude/worktrees/NAME` on branch `NAME`. Then, for each line of the project's `.claude/workspace-repos`, it adds a worktree of that repository inside it at `workspace/DIR`, on a branch `NAME` of that repository. `workspace-remove` runs as the `WorktreeRemove` hook and removes all of them together.
+
+A project opts in with two entries in its `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "WorktreeCreate": [{ "hooks": [{ "type": "command", "command": "\"$HOME/.claude/plugins/marketplaces/dokidlc/bin/workspace-create\"" }] }],
+    "WorktreeRemove": [{ "hooks": [{ "type": "command", "command": "\"$HOME/.claude/plugins/marketplaces/dokidlc/bin/workspace-remove\"" }] }]
+  }
+}
+```
+
+and a `.claude/workspace-repos` file, one repository per line:
+
+```
+# DIR  PATH             [LINK...]
+api    ~/Code/api       node_modules
+infra  ~/Code/infra
+```
+
+`PATH` is a clone that all sessions share. Each `LINK` is a gitignored path in that clone, symlinked into the new worktree so a dependency directory is not installed again. Add `workspace/` and `.claude/worktrees/` to the project's `.gitignore`.
+
+Then `claude --worktree fix-login` starts in a workspace:
+
+```
+.claude/worktrees/fix-login/                 branch fix-login of the project
+.claude/worktrees/fix-login/workspace/api/   branch fix-login of ~/Code/api
+.claude/worktrees/fix-login/workspace/infra/ branch fix-login of ~/Code/infra
+```
+
+On a machine whose marketplace clone predates these scripts, `claude --worktree` fails in such a project with "WorktreeCreate hook failed ... not found"; run `update-plugins` there first. [docs/session-workspaces.md](docs/session-workspaces.md) has the removal rule and the other things to know before you rely on it.
+
 ## Caveats
 
 - Restart your session after an update. Claude Code loads plugins at session start.
