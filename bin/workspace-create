@@ -9,10 +9,11 @@
 # agent repo's .claude/workspace-repos at workspace/DIR, on branch NAME of
 # that repo.
 #
-# A line of .claude/workspace-repos is "DIR PATH [LINK...]". PATH is the
-# shared clone and may start with ~/. Each LINK is a gitignored path that is
-# symlinked from the shared clone into the new worktree. A PATH that does
-# not exist gets a warning and no worktree.
+# A line of .claude/workspace-repos is "DIR PATH [LINK...]", split at
+# whitespace, so no field can hold a space. PATH is the shared clone and may
+# start with ~/. Each LINK is a gitignored path that is symlinked from the
+# shared clone into the new worktree. A PATH that does not exist gets a
+# warning and no worktree.
 #
 # Safe to run again for the same name: it reuses the branches and worktrees
 # that exist.
@@ -20,30 +21,42 @@ set -eu
 
 name=$(jq -r .name)
 case $name in
-''|null|.*|*/*) echo "workspace-create: bad name '$name'" >&2; exit 1 ;;
+'' | null | .* | -* | */* | *[[:space:]]*)
+    echo "workspace-create: bad name '$name'" >&2
+    exit 1
+    ;;
 esac
 
 # The main checkout, also when this runs from inside a workspace.
 root=$(dirname "$(git -C "${CLAUDE_PROJECT_DIR:-.}" rev-parse --path-format=absolute --git-common-dir)")
 
-# Make branch $name in REPO if it is missing. The base is origin/$name when
-# an earlier workspace pushed it, else the remote default branch, else HEAD
-# in a repo with no remote.
+# Make branch $name in REPO if it is missing, and mark it as made here so
+# that workspace-remove deletes it and leaves a branch that was there before.
+# In a repo with a remote the base is origin/$name when an earlier workspace
+# pushed it, else the remote's default branch. With no remote it is HEAD.
 ensure_branch() {
     repo=$1
     git -C "$repo" show-ref --verify --quiet "refs/heads/$name" && return 0
-    if base=$(git -C "$repo" symbolic-ref -q refs/remotes/origin/HEAD); then
+    base=HEAD
+    if git -C "$repo" remote get-url origin >/dev/null 2>&1; then
         # A slow remote must not hold up the session; macOS has no timeout.
         if command -v timeout >/dev/null 2>&1; then
-            timeout 10 git -C "$repo" fetch --quiet origin >&2
+            GIT_TERMINAL_PROMPT=0 timeout 10 git -C "$repo" fetch --quiet origin >&2
         else
-            git -C "$repo" fetch --quiet origin >&2
+            GIT_TERMINAL_PROMPT=0 git -C "$repo" fetch --quiet origin >&2
         fi || echo "workspace-create: fetch failed in $repo; using cached refs" >&2
-        git -C "$repo" show-ref --verify --quiet "refs/remotes/origin/$name" && base=refs/remotes/origin/$name
-    else
-        base=HEAD
+        for ref in "refs/remotes/origin/$name" \
+            "$(git -C "$repo" symbolic-ref -q refs/remotes/origin/HEAD || true)" \
+            refs/remotes/origin/main refs/remotes/origin/master; do
+            [ -n "$ref" ] || continue
+            if git -C "$repo" show-ref --verify --quiet "$ref"; then
+                base=$ref
+                break
+            fi
+        done
     fi
     git -C "$repo" branch --no-track "$name" "$base" >&2
+    git -C "$repo" config "branch.$name.workspace" true
 }
 
 # Make a worktree of REPO at DEST on branch $name, unless DEST is one already.
@@ -51,9 +64,12 @@ ensure_worktree() {
     repo=$1
     dest=$2
     [ -e "$dest/.git" ] && return 0
-    git -C "$repo" worktree prune
     ensure_branch "$repo"
-    git -C "$repo" worktree add "$dest" "$name" >&2
+    # A workspace deleted by hand leaves a stale record that blocks the add.
+    git -C "$repo" worktree add "$dest" "$name" >&2 2>/dev/null || {
+        git -C "$repo" worktree prune
+        git -C "$repo" worktree add "$dest" "$name" >&2
+    }
 }
 
 # Symlink LINK from the shared clone REPO into its worktree DEST. git ignores
@@ -67,7 +83,12 @@ ensure_link() {
     [ -e "$dest/$link" ] || [ -L "$dest/$link" ] || ln -s "$repo/$link" "$dest/$link"
     exclude=$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/info/exclude
     mkdir -p "$(dirname "$exclude")"
-    grep -qxF "/$link" "$exclude" 2>/dev/null || echo "/$link" >>"$exclude"
+    grep -qxF "/$link" "$exclude" 2>/dev/null && return 0
+    # Start a new line when the file does not end in one.
+    if [ -s "$exclude" ] && [ -n "$(tail -c 1 "$exclude")" ]; then
+        echo >>"$exclude"
+    fi
+    echo "/$link" >>"$exclude"
 }
 
 ws=$root/.claude/worktrees/$name
@@ -75,7 +96,7 @@ ensure_worktree "$root" "$ws"
 
 list=$root/.claude/workspace-repos
 if [ -f "$list" ]; then
-    grep -v '^[[:space:]]*\(#\|$\)' "$list" | while read -r dir path links; do
+    grep -Ev '^[[:space:]]*(#|$)' "$list" | while read -r dir path links; do
         case $path in "~/"*) path=$HOME/${path#"~/"} ;; esac
         if [ ! -d "$path/.git" ]; then
             echo "workspace-create: $path is not a git clone; no workspace/$dir" >&2

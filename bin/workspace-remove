@@ -3,27 +3,39 @@
 #
 # A Claude Code WorktreeRemove hook for the workspaces that workspace-create
 # makes. It reads worktree_path from the JSON on stdin. It exits 1 and
-# leaves the workspace in place while any repo in it has uncommitted
-# changes, or a commit that no remote branch and no other local branch has.
-# Otherwise it removes every worktree, nested ones first, and deletes the
-# local branches. Claude Code never deletes a branch of a hook-made
-# worktree, so this script must.
+# leaves the workspace in place when anything under workspace/ is not a
+# linked worktree, when git cannot read a repo's state, or when a repo has
+# uncommitted changes or a commit that no remote branch and no other local
+# branch has. Otherwise it removes every worktree, nested ones first, and
+# deletes the local branches that workspace-create made. Claude Code never
+# deletes a branch of a hook-made worktree, so this script must.
+#
+# Removal deletes gitignored files in the worktrees with them.
 set -eu
 
 ws=$(jq -r .worktree_path)
 [ -d "$ws" ] || exit 0
 name=$(basename "$ws")
-list=$(mktemp)
-trap 'rm -f "$list"' EXIT
 
-# One line per worktree in the workspace, "DIR MAIN", nested ones first.
-# MAIN is the checkout the worktree is linked from.
-for d in "$ws"/workspace/*/ "$ws/"; do
-    d=${d%/}
-    [ -f "$d/.git" ] || continue
-    main=$(dirname "$(git -C "$d" rev-parse --path-format=absolute --git-common-dir)")
-    printf '%s %s\n' "$d" "$main" >>"$list"
-done
+refuse() {
+    echo "workspace-remove: $1; workspace kept" >&2
+    exit 1
+}
+
+# The worktrees of the workspace, one path per line, nested ones first.
+trees() {
+    for d in "$ws"/workspace/*; do
+        [ -e "$d" ] || [ -L "$d" ] || continue
+        printf '%s\n' "$d"
+    done
+    printf '%s\n' "$ws"
+}
+
+# The checkout that the worktree DIR is linked from.
+main_of() {
+    common=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir) || return 1
+    dirname "$common"
+}
 
 # Count the commits of REV in DIR that are on no remote branch and on no
 # local branch other than $name.
@@ -34,25 +46,29 @@ unsaved() {
         git -C "$1" rev-list --count "$2" --stdin
 }
 
-# Check every tree before removing any.
-while read -r dir main; do
-    if [ -n "$(git -C "$dir" status --porcelain)" ]; then
-        echo "workspace-remove: $dir has uncommitted changes; workspace kept" >&2
-        exit 1
-    fi
+# Check every tree before removing any. A clone or a loose file under
+# workspace/ would be deleted unchecked with the agent worktree, so it stops
+# the removal.
+list=$(mktemp)
+trap 'rm -f "$list"' EXIT
+trees >"$list"
+
+while IFS= read -r dir; do
+    [ -f "$dir/.git" ] || refuse "$dir is not a linked worktree"
+    state=$(git -C "$dir" status --porcelain) || refuse "git status failed in $dir"
+    [ -z "$state" ] || refuse "$dir has uncommitted changes"
     for rev in HEAD "refs/heads/$name"; do
         git -C "$dir" rev-parse --verify --quiet "$rev" >/dev/null || continue
-        n=$(unsaved "$dir" "$rev")
-        if [ "$n" -gt 0 ]; then
-            echo "workspace-remove: $dir has $n commits on $rev that are not pushed or merged; workspace kept" >&2
-            exit 1
-        fi
+        count=$(unsaved "$dir" "$rev") || refuse "git could not list the commits of $rev in $dir"
+        [ "$count" = 0 ] || refuse "$dir has $count commits on $rev that are not pushed or merged"
     done
 done <"$list"
 
-while read -r dir main; do
+while IFS= read -r dir; do
+    main=$(main_of "$dir")
     git -C "$main" worktree remove --force "$dir" >&2
-    git -C "$main" show-ref --verify --quiet "refs/heads/$name" &&
+    if [ "$(git -C "$main" config --get "branch.$name.workspace" || true)" = true ]; then
         git -C "$main" branch -D "$name" >&2
+    fi
 done <"$list"
 exit 0

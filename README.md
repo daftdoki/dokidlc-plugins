@@ -60,7 +60,7 @@ It refreshes the marketplace clone first, because `claude plugin update` reads t
 
 ## Session workspaces
 
-`bin/` also holds two hook scripts that are not plugins. With them, a Claude Code session that starts in a worktree gets a worktree of each other repository it works on, so two sessions never share a checkout.
+`bin/` also holds two hook scripts that are not plugins. With them, a Claude Code session that starts in a worktree gets a worktree of each other repository the project lists, so two such sessions do not share a checkout of a listed repository.
 
 `workspace-create` runs as the `WorktreeCreate` hook. It makes the usual worktree at `.claude/worktrees/NAME` on branch `NAME`. Then, for each line of the project's `.claude/workspace-repos`, it adds a worktree of that repository inside it at `workspace/DIR`, on a branch `NAME` of that repository. `workspace-remove` runs as the `WorktreeRemove` hook and removes all of them together.
 
@@ -83,7 +83,7 @@ api    ~/Code/api       node_modules
 infra  ~/Code/infra
 ```
 
-`PATH` is a clone that all sessions share. Each `LINK` is a gitignored path in that clone, symlinked into the new worktree so a dependency directory is not installed again. Add `workspace/` and `.claude/worktrees/` to the project's `.gitignore`.
+The fields are split at whitespace, so none can hold a space. `PATH` is a clone that all sessions share. Each `LINK` is a gitignored path in that clone, symlinked into the new worktree so a dependency directory is not installed again. Add `workspace/` and `.claude/worktrees/` to the project's `.gitignore`.
 
 Then `claude --worktree fix-login` starts in a workspace:
 
