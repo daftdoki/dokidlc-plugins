@@ -1,6 +1,6 @@
 {
   "name": "dokidlc",
-  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, memory, unslop, writing-for-agents, and readme.",
+  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, memory, unslop, writing-for-agents, readme, and naming-is-hard.",
   "owner": {
     "name": "DaftDoki"
   },
@@ -48,6 +48,15 @@
         "source": "github",
         "repo": "daftdoki/dokidlc-skill-readme",
         "sha": "2dd7a8c2b3a412511235d644a16a80e46715fc9f"
+      }
+    },
+    {
+      "name": "naming-is-hard",
+      "description": "Names a person understands on first read: a naming rule Claude follows, and two name reviews",
+      "source": {
+        "source": "github",
+        "repo": "daftdoki/dokidlc-skill-naming-is-hard",
+        "sha": "0e392b99b91a6c0ff5a9a0630013419f64e8f599"
       }
     }
   ]

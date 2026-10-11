@@ -2,7 +2,7 @@
 
 The catalog for the `dokidlc` plugin marketplace.
 
-Five Claude Code plugins live here, one per repository, each pinned to a commit. Adding the marketplace makes all five available to install; you install the ones a project needs and leave the rest. The plugins are independent, so a repository can take memory alone, or questlog and writing-for-agents together, and nothing breaks.
+Six Claude Code plugins live here, one per repository, each pinned to a commit. Adding the marketplace makes all six available to install; you install the ones a project needs and leave the rest. The plugins are independent, so a repository can take memory alone, or questlog and writing-for-agents together, and nothing breaks.
 
 | Plugin | What it does |
 | --- | --- |
@@ -10,13 +10,14 @@ Five Claude Code plugins live here, one per repository, each pinned to a commit.
 | [memory](https://github.com/daftdoki/dokidlc-skill-memory) | A per-agent memory of markdown pages in `.memory/`, written and recalled by hooks. Pages never expire; a page that proves wrong gets flagged for review instead. |
 | [unslop](https://github.com/daftdoki/dokidlc-skill-unslop) | Rules for cutting AI tells from writing and keeping a human voice. Lauren Tan's pstack skill with the soul section kept. The plugin puts the rules in context at every session and subagent start. |
 | [writing-for-agents](https://github.com/daftdoki/dokidlc-skill-writing-for-agents) | The reference for writing skills, `CLAUDE.md`, and any document an agent reads. Matt Pocock's skill, vendored unchanged. |
+| [naming-is-hard](https://github.com/daftdoki/dokidlc-skill-naming-is-hard) | A rule Claude follows while it names commands, settings, and flags, so a person understands each name on first read, and two reviews: one for names experts read, one for names users see. |
 | [readme](https://github.com/daftdoki/dokidlc-skill-readme) | Writes, grades, and keeps a `README.md` for the person deciding whether to use the software. Three verbs and `readme-check`, a checker that gates on why and status. |
 
 ## Why this marketplace
 
-This is my standard set of plugins, in one place so a new machine or a new project is two commands away from the setup I work with. Three I wrote; two are other people's skills rehosted as plugins, pinned so an upstream change is something I pull rather than something that arrives mid-session. The set is opinionated by definition, since the only thing the five have in common is that I use them.
+This is my standard set of plugins, in one place so a new machine or a new project is two commands away from the setup I work with. Four I wrote; two are other people's skills rehosted as plugins, pinned so an upstream change is something I pull rather than something that arrives mid-session. The set is opinionated by definition, since the only thing the six have in common is that I use them.
 
-It is not a general catalog. Nothing is accepted from outside, and a pin moves when I have reviewed the work behind it. Install any of the five if it suits you; if you want to build on the set, fork the repositories rather than wait on this catalog.
+It is not a general catalog. Nothing is accepted from outside, and a pin moves when I have reviewed the work behind it. Install any of the six if it suits you; if you want to build on the set, fork the repositories rather than wait on this catalog.
 
 Status: maintained, and the pins move most weeks. Claude Code 2.1.195 or later.
 
