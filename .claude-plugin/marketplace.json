@@ -1,6 +1,6 @@
 {
   "name": "dokidlc",
-  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, memory, unslop, writing-for-agents, readme, and naming-is-hard.",
+  "description": "DaftDoki's plugins for the agents in ~/Code/agents: questlog, iirc, unslop, writing-for-agents, readme, and naming-is-hard.",
   "owner": {
     "name": "DaftDoki"
   },
@@ -15,12 +15,12 @@
       }
     },
     {
-      "name": "memory",
-      "description": "A per-agent memory in the memoryfield format, searched semantically, with suspicion instead of expiry",
+      "name": "iirc",
+      "description": "What past sessions learned, as markdown pages in .iirc/, built on Cal Paterson's memoryfields, searched semantically, with suspicion instead of expiry",
       "source": {
         "source": "github",
-        "repo": "daftdoki/dokidlc-skill-memory",
-        "sha": "52eac58dd9ad043a795d09eeec39a1f8956c22b1"
+        "repo": "daftdoki/dokidlc-iirc",
+        "sha": "13b2117f4674a22d1e09319c9e129608e10527ea"
       }
     },
     {

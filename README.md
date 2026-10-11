@@ -2,12 +2,12 @@
 
 The catalog for the `dokidlc` plugin marketplace.
 
-Six Claude Code plugins live here, one per repository, each pinned to a commit. Adding the marketplace makes all six available to install; you install the ones a project needs and leave the rest. The plugins are independent, so a repository can take memory alone, or questlog and writing-for-agents together, and nothing breaks.
+Six Claude Code plugins live here, one per repository, each pinned to a commit. Adding the marketplace makes all six available to install; you install the ones a project needs and leave the rest. The plugins are independent, so a repository can take iirc alone, or questlog and writing-for-agents together, and nothing breaks.
 
 | Plugin | What it does |
 | --- | --- |
 | [questlog](https://github.com/daftdoki/dokidlc-skill-questlog) | Tracks work as quests and chores with staged review. The agent drafts, you decide. |
-| [memory](https://github.com/daftdoki/dokidlc-skill-memory) | A per-agent memory of markdown pages in `.memory/`, written and recalled by hooks. Pages never expire; a page that proves wrong gets flagged for review instead. |
+| [iirc](https://github.com/daftdoki/dokidlc-iirc) | What past sessions learned, as markdown pages in `.iirc/`, searched by meaning and suggested by a hook when a prompt matches. Pages never expire; a page whose cited files changed is marked suspect. `iirc migrate` moves a repository from the retired memory plugin. |
 | [unslop](https://github.com/daftdoki/dokidlc-skill-unslop) | Rules for cutting AI tells from writing and keeping a human voice. Lauren Tan's pstack skill with the soul section kept. The plugin puts the rules in context at every session and subagent start. |
 | [writing-for-agents](https://github.com/daftdoki/dokidlc-skill-writing-for-agents) | The reference for writing skills, `CLAUDE.md`, and any document an agent reads. Matt Pocock's skill, vendored unchanged. |
 | [naming-is-hard](https://github.com/daftdoki/dokidlc-skill-naming-is-hard) | A rule Claude follows while it names commands, settings, and flags, so a person understands each name on first read, and two reviews: one for names experts read, one for names users see. |
@@ -27,7 +27,7 @@ Add the marketplace once per machine, then install the plugins you want:
 
 ```
 /plugin marketplace add daftdoki/dokidlc-plugins
-claude plugin install memory@dokidlc
+claude plugin install iirc@dokidlc
 ```
 
 A repository can declare the marketplace for everyone who clones it, in `.claude/settings.json`:
@@ -35,7 +35,7 @@ A repository can declare the marketplace for everyone who clones it, in `.claude
 ```json
 {
   "extraKnownMarketplaces": { "dokidlc": { "source": { "source": "github", "repo": "daftdoki/dokidlc-plugins" } } },
-  "enabledPlugins": { "memory@dokidlc": true }
+  "enabledPlugins": { "iirc@dokidlc": true }
 }
 ```
 
